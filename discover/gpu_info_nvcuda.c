@@ -1,9 +1,11 @@
 #ifndef __APPLE__  // TODO - maybe consider nvidia support on intel macs?
 
 #include <string.h>
+#include <inttypes.h>
 #include "gpu_info_nvcuda.h"
 
 void nvcuda_init(char *nvcuda_lib_path, nvcuda_init_resp_t *resp) {
+  LOG(resp->ch.verbose, "initializing %s\n", nvcuda_lib_path);
   CUresult ret;
   resp->err = NULL;
   resp->num_devices = 0;
@@ -57,8 +59,10 @@ void nvcuda_init(char *nvcuda_lib_path, nvcuda_init_resp_t *resp) {
       resp->cudaErr = -1;
       return;
     }
+    LOG(resp->ch.verbose, "dlsym: %s - %p\n", l[i].s, *l[i].p);
   }
 
+  LOG(resp->ch.verbose, "calling cuInit\n");
   ret = (*resp->ch.cuInit)(0);
   if (ret != CUDA_SUCCESS) {
     LOG(resp->ch.verbose, "cuInit err: %d\n", ret);
@@ -75,15 +79,18 @@ void nvcuda_init(char *nvcuda_lib_path, nvcuda_init_resp_t *resp) {
   resp->ch.driver_minor = 0;
 
   // Report driver version if we're in verbose mode, ignore errors
+  LOG(resp->ch.verbose, "calling cuDriverGetVersion\n");
   ret = (*resp->ch.cuDriverGetVersion)(&version);
   if (ret != CUDA_SUCCESS) {
     LOG(resp->ch.verbose, "cuDriverGetVersion failed: %d\n", ret);
   } else {
+    LOG(resp->ch.verbose, "raw version 0x%x\n", version);
     resp->ch.driver_major = version / 1000;
     resp->ch.driver_minor = (version - (resp->ch.driver_major * 1000)) / 10;
     LOG(resp->ch.verbose, "CUDA driver version: %d.%d\n", resp->ch.driver_major, resp->ch.driver_minor);
   }
 
+  LOG(resp->ch.verbose, "calling cuDeviceGetCount\n");
   ret = (*resp->ch.cuDeviceGetCount)(&resp->num_devices);
   if (ret != CUDA_SUCCESS) {
     LOG(resp->ch.verbose, "cuDeviceGetCount err: %d\n", ret);
@@ -94,6 +101,7 @@ void nvcuda_init(char *nvcuda_lib_path, nvcuda_init_resp_t *resp) {
     resp->cudaErr = ret;
     return;
   }
+  LOG(resp->ch.verbose, "device count %d\n", resp->num_devices);
 }
 
 const int buflen = 256;
@@ -186,8 +194,8 @@ void nvcuda_bootstrap(nvcuda_handle_t h, int i, mem_info_t *resp) {
   resp->total = memInfo.total;
   resp->free = memInfo.free;
 
-  LOG(h.verbose, "[%s] CUDA totalMem %lu mb\n", resp->gpu_id, resp->total / 1024 / 1024);
-  LOG(h.verbose, "[%s] CUDA freeMem %lu mb\n", resp->gpu_id, resp->free / 1024 / 1024);
+  LOG(h.verbose, "[%s] CUDA totalMem %" PRId64 "mb\n", resp->gpu_id, resp->total / 1024 / 1024);
+  LOG(h.verbose, "[%s] CUDA freeMem %" PRId64 "mb\n", resp->gpu_id, resp->free / 1024 / 1024);
   LOG(h.verbose, "[%s] Compute Capability %d.%d\n", resp->gpu_id, resp->major, resp->minor);
 
   

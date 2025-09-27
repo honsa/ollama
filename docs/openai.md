@@ -1,6 +1,7 @@
 # OpenAI compatibility
 
-> **Note:** OpenAI compatibility is experimental and is subject to major adjustments including breaking changes. For fully-featured access to the Ollama API, see the Ollama [Python library](https://github.com/ollama/ollama-python), [JavaScript library](https://github.com/ollama/ollama-js) and [REST API](https://github.com/ollama/ollama/blob/main/docs/api.md).
+> [!NOTE]
+> OpenAI compatibility is experimental and is subject to major adjustments including breaking changes. For fully-featured access to the Ollama API, see the Ollama [Python library](https://github.com/ollama/ollama-python), [JavaScript library](https://github.com/ollama/ollama-js) and [REST API](https://github.com/ollama/ollama/blob/main/docs/api.md).
 
 Ollama provides experimental compatibility with parts of the [OpenAI API](https://platform.openai.com/docs/api-reference) to help connect existing applications to Ollama.
 
@@ -60,6 +61,42 @@ embeddings = client.embeddings.create(
 )
 ```
 
+#### Structured outputs
+
+```python
+from pydantic import BaseModel
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+
+# Define the schema for the response
+class FriendInfo(BaseModel):
+    name: str
+    age: int
+    is_available: bool
+
+class FriendList(BaseModel):
+    friends: list[FriendInfo]
+
+try:
+    completion = client.beta.chat.completions.parse(
+        temperature=0,
+        model="llama3.1:8b",
+        messages=[
+            {"role": "user", "content": "I have two friends. The first is Ollama 22 years old busy saving the world, and the second is Alonso 23 years old and wants to hang out. Return a list of friends in JSON format"}
+        ],
+        response_format=FriendList,
+    )
+
+    friends_response = completion.choices[0].message
+    if friends_response.parsed:
+        print(friends_response.parsed)
+    elif friends_response.refusal:
+        print(friends_response.refusal)
+except Exception as e:
+    print(f"Error: {e}")
+```
+
 ### OpenAI JavaScript library
 
 ```javascript
@@ -110,7 +147,7 @@ const embedding = await openai.embeddings.create({
 
 ### `curl`
 
-``` shell
+```shell
 curl http://localhost:11434/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{
@@ -181,7 +218,7 @@ curl http://localhost:11434/v1/embeddings \
 - [x] JSON mode
 - [x] Reproducible outputs
 - [x] Vision
-- [x] Tools (streaming support coming soon)
+- [x] Tools
 - [ ] Logprobs
 
 #### Supported request fields
@@ -199,6 +236,8 @@ curl http://localhost:11434/v1/embeddings \
 - [x] `seed`
 - [x] `stop`
 - [x] `stream`
+- [x] `stream_options`
+  - [x] `include_usage`
 - [x] `temperature`
 - [x] `top_p`
 - [x] `max_tokens`
@@ -227,6 +266,8 @@ curl http://localhost:11434/v1/embeddings \
 - [x] `seed`
 - [x] `stop`
 - [x] `stream`
+- [x] `stream_options`
+  - [x] `include_usage`
 - [x] `temperature`
 - [x] `top_p`
 - [x] `max_tokens`
@@ -281,7 +322,7 @@ ollama pull llama3.2
 
 For tooling that relies on default OpenAI model names such as `gpt-3.5-turbo`, use `ollama cp` to copy an existing model name to a temporary name:
 
-```
+```shell
 ollama cp llama3.2 gpt-3.5-turbo
 ```
 
@@ -305,7 +346,7 @@ curl http://localhost:11434/v1/chat/completions \
 
 The OpenAI API does not have a way of setting the context size for a model. If you need to change the context size, create a `Modelfile` which looks like:
 
-```modelfile
+```
 FROM <some model>
 PARAMETER num_ctx <context size>
 ```

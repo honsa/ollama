@@ -25,10 +25,10 @@ type GpuInfo struct { // TODO better name maybe "InferenceProcessor"?
 	MinimumMemory uint64 `json:"-"`
 
 	// Any extra PATH/LD_LIBRARY_PATH dependencies required for the Library to operate properly
-	DependencyPath string `json:"lib_path,omitempty"`
+	DependencyPath []string `json:"lib_path,omitempty"`
 
-	// Extra environment variables specific to the GPU as list of [key,value]
-	EnvWorkarounds [][2]string `json:"envs,omitempty"`
+	// Extra environment variables specific to the GPU as list of [key=value]
+	EnvWorkarounds []string `json:"envs,omitempty"`
 
 	// Set to true if we can NOT reliably discover FreeMemory.  A value of true indicates
 	// the FreeMemory is best effort, and may over or under report actual memory usage
@@ -36,15 +36,23 @@ type GpuInfo struct { // TODO better name maybe "InferenceProcessor"?
 	UnreliableFreeMemory bool
 
 	// GPU information
-	ID      string `json:"gpu_id"`  // string to use for selection of this specific GPU
-	Name    string `json:"name"`    // user friendly name if available
-	Compute string `json:"compute"` // Compute Capability or gfx
+	ID       string `json:"gpu_id"` // string to use for selection of this specific GPU
+	filterID int    //nolint:unused,nolintlint // AMD Workaround: The numeric ID of the device used to filter out other devices
+	Name     string `json:"name"`    // user friendly name if available
+	Compute  string `json:"compute"` // Compute Capability or gfx
 
 	// Driver Information - TODO no need to put this on each GPU
 	DriverMajor int `json:"driver_major,omitempty"`
 	DriverMinor int `json:"driver_minor,omitempty"`
 
 	// TODO other performance capability info to help in scheduling decisions
+}
+
+func (gpu GpuInfo) RunnerName() string {
+	if gpu.Variant != "" {
+		return gpu.Library + "_" + gpu.Variant
+	}
+	return gpu.Library
 }
 
 type CPUInfo struct {
@@ -99,7 +107,7 @@ func (l GpuInfoList) ByLibrary() []GpuInfoList {
 	for _, info := range l {
 		found := false
 		requested := info.Library
-		if info.Variant != CPUCapabilityNone.String() {
+		if info.Variant != "" {
 			requested += "_" + info.Variant
 		}
 		for i, lib := range libs {
@@ -140,29 +148,6 @@ func (a ByFreeMemory) Len() int           { return len(a) }
 func (a ByFreeMemory) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByFreeMemory) Less(i, j int) bool { return a[i].FreeMemory < a[j].FreeMemory }
 
-type CPUCapability uint32
-
-// Override at build time when building base GPU runners
-var GPURunnerCPUCapability = CPUCapabilityAVX
-
-const (
-	CPUCapabilityNone CPUCapability = iota
-	CPUCapabilityAVX
-	CPUCapabilityAVX2
-	// TODO AVX512
-)
-
-func (c CPUCapability) String() string {
-	switch c {
-	case CPUCapabilityAVX:
-		return "avx"
-	case CPUCapabilityAVX2:
-		return "avx2"
-	default:
-		return "no vector extensions"
-	}
-}
-
 type SystemInfo struct {
 	System          CPUInfo              `json:"system"`
 	GPUs            []GpuInfo            `json:"gpus"`
@@ -182,4 +167,19 @@ func (si SystemInfo) GetOptimalThreadCount() int {
 	}
 
 	return coreCount
+}
+
+// For each GPU, check if it does NOT support flash attention
+func (l GpuInfoList) FlashAttentionSupported() bool {
+	for _, gpu := range l {
+		supportsFA := gpu.Library == "cpu" ||
+			gpu.Library == "metal" ||
+			(gpu.Library == "cuda" && gpu.DriverMajor >= 7) ||
+			gpu.Library == "rocm"
+
+		if !supportsFA {
+			return false
+		}
+	}
+	return true
 }

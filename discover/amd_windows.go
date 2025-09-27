@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -50,6 +49,7 @@ func AMDGetGPUInfo() ([]RocmGPUInfo, error) {
 		slog.Info(err.Error())
 		return nil, err
 	}
+
 	libDir, err := AMDValidateLibDir()
 	if err != nil {
 		err = fmt.Errorf("unable to verify rocm library: %w", err)
@@ -111,7 +111,8 @@ func AMDGetGPUInfo() ([]RocmGPUInfo, error) {
 				UnreliableFreeMemory: true,
 
 				ID:             strconv.Itoa(i), // TODO this is probably wrong if we specify visible devices
-				DependencyPath: libDir,
+				filterID:       i,
+				DependencyPath: []string{libDir},
 				MinimumMemory:  rocmMinimumMemory,
 				Name:           name,
 				Compute:        gfx,
@@ -162,9 +163,7 @@ func AMDValidateLibDir() (string, error) {
 	}
 
 	// Installer payload (if we're running from some other location)
-	localAppData := os.Getenv("LOCALAPPDATA")
-	appDir := filepath.Join(localAppData, "Programs", "Ollama")
-	rocmTargetDir := filepath.Join(appDir, envconfig.LibRelativeToExe(), "lib", "ollama")
+	rocmTargetDir := filepath.Join(LibOllamaPath, "rocm")
 	if rocmLibUsable(rocmTargetDir) {
 		slog.Debug("detected ollama installed ROCm at " + rocmTargetDir)
 		return rocmTargetDir, nil
@@ -182,7 +181,7 @@ func (gpus RocmGPUInfoList) RefreshFreeMemory() error {
 	hl, err := NewHipLib()
 	if err != nil {
 		slog.Debug(err.Error())
-		return nil
+		return err
 	}
 	defer hl.Release()
 
@@ -202,19 +201,26 @@ func (gpus RocmGPUInfoList) RefreshFreeMemory() error {
 	return nil
 }
 
-func rocmGetVisibleDevicesEnv(gpuInfo []GpuInfo) (string, string) {
+func rocmGetVisibleDevicesEnv(gpuInfo []GpuInfo) string {
 	ids := []string{}
 	for _, info := range gpuInfo {
 		if info.Library != "rocm" {
-			// TODO shouldn't happen if things are wired correctly...
-			slog.Debug("rocmGetVisibleDevicesEnv skipping over non-rocm device", "library", info.Library)
 			continue
 		}
-		ids = append(ids, info.ID)
+		// If the devices requires a numeric ID, for filtering purposes, we use the unfiltered ID number
+		if _, err := strconv.Atoi(info.ID); err == nil {
+			ids = append(ids, fmt.Sprintf("%d", info.filterID))
+		} else {
+			ids = append(ids, info.ID)
+		}
 	}
+	if len(ids) == 0 {
+		return ""
+	}
+
 	// There are 3 potential env vars to use to select GPUs.
 	// ROCR_VISIBLE_DEVICES supports UUID or numeric but does not work on Windows
 	// HIP_VISIBLE_DEVICES supports numeric IDs only
 	// GPU_DEVICE_ORDINAL supports numeric IDs only
-	return "HIP_VISIBLE_DEVICES", strings.Join(ids, ",")
+	return "HIP_VISIBLE_DEVICES=" + strings.Join(ids, ",")
 }

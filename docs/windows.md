@@ -30,23 +30,10 @@ To install the Ollama application in a location different than your home directo
 OllamaSetup.exe /DIR="d:\some\location"
 ```
 
-### Changing Model Location
-
-To change where Ollama stores the downloaded models instead of using your home directory, set the environment variable `OLLAMA_MODELS` in your user account.
-
-1. Start the Settings (Windows 11) or Control Panel (Windows 10) application and search for _environment variables_.
-
-2. Click on _Edit environment variables for your account_.
-
-3. Edit or create a new variable for your user account for `OLLAMA_MODELS` where you want the models stored
-
-4. Click OK/Apply to save.
-
-If Ollama is already running, Quit the tray application and relaunch it from the Start menu, or a new terminal started after you saved the environment variables.
-
 ## API Access
 
 Here's a quick example showing API access from `powershell`
+
 ```powershell
 (Invoke-WebRequest -method POST -Body '{"model":"llama3.2", "prompt":"Why is the sky blue?", "stream": false}' -uri http://localhost:11434/api/generate ).Content | ConvertFrom-json
 ```
@@ -54,14 +41,13 @@ Here's a quick example showing API access from `powershell`
 ## Troubleshooting
 
 Ollama on Windows stores files in a few different locations.  You can view them in
-the explorer window by hitting `<cmd>+R` and type in:
+the explorer window by hitting `<Ctrl>+R` and type in:
 - `explorer %LOCALAPPDATA%\Ollama` contains logs, and downloaded updates
     - *app.log* contains most resent logs from the GUI application
     - *server.log* contains the most recent server logs
     - *upgrade.log* contains log output for upgrades
 - `explorer %LOCALAPPDATA%\Programs\Ollama` contains the binaries (The installer adds this to your user PATH)
 - `explorer %HOMEPATH%\.ollama` contains models and configuration
-- `explorer %TEMP%` contains temporary executable files in one or more `ollama*` directories
 
 ## Uninstall
 
@@ -80,6 +66,11 @@ help you keep up to date.
 
 If you'd like to install or integrate Ollama as a service, a standalone
 `ollama-windows-amd64.zip` zip file is available containing only the Ollama CLI
-and GPU library dependencies for Nvidia and AMD. This allows for embedding
-Ollama in existing applications, or running it as a system service via `ollama
-serve` with tools such as [NSSM](https://nssm.cc/).
+and GPU library dependencies for Nvidia.  If you have an AMD GPU, also download
+and extract the additional ROCm package `ollama-windows-amd64-rocm.zip` into the
+same directory.  Both zip files are necessary for a complete AMD installation.
+This allows for embedding Ollama in existing applications, or running it as a
+system service via `ollama serve` with tools such as [NSSM](https://nssm.cc/). 
+
+> [!NOTE]  
+> If you are upgrading from a prior version, you should remove the old directories first.

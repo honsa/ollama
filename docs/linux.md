@@ -10,10 +10,14 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 ## Manual install
 
+> [!NOTE]
+> If you are upgrading from a prior version, you **MUST** remove the old libraries with `sudo rm -rf /usr/lib/ollama` first.
+
 Download and extract the package:
 
 ```shell
-curl -L https://ollama.com/download/ollama-linux-amd64.tgz -o ollama-linux-amd64.tgz
+curl -LO https://ollama.com/download/ollama-linux-amd64.tgz
+sudo rm -rf /usr/lib/ollama
 sudo tar -C /usr -xzf ollama-linux-amd64.tgz
 ```
 
@@ -31,7 +35,11 @@ ollama -v
 
 ### AMD GPU install
 
-If you have an AMD GPU, also download and extract the additional ROCm package:
+If you have an AMD GPU, **also** download and extract the additional ROCm package:
+
+> [!IMPORTANT]
+> The ROCm tgz contains only AMD dependent libraries.  You must extract **both** `ollama-linux-amd64.tgz` and `ollama-linux-amd64-rocm.tgz` into the same location.
+
 
 ```shell
 curl -L https://ollama.com/download/ollama-linux-amd64-rocm.tgz -o ollama-linux-amd64-rocm.tgz
@@ -72,7 +80,7 @@ RestartSec=3
 Environment="PATH=$PATH"
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 ```
 
 Then start the service:
@@ -109,8 +117,23 @@ sudo systemctl status ollama
 > While AMD has contributed the `amdgpu` driver upstream to the official linux
 > kernel source, the version is older and may not support all ROCm features. We
 > recommend you install the latest driver from
-> https://www.amd.com/en/support/linux-drivers for best support of your Radeon
-> GPU.
+> [AMD](https://www.amd.com/en/support/download/linux-drivers.html) for best support
+> of your Radeon GPU.
+
+## Customizing
+
+To customize the installation of Ollama, you can edit the systemd service file or the environment variables by running:
+
+```shell
+sudo systemctl edit ollama
+```
+
+Alternatively, create an override file manually in `/etc/systemd/system/ollama.service.d/override.conf`:
+
+```ini
+[Service]
+Environment="OLLAMA_DEBUG=1"
+```
 
 ## Updating
 
@@ -129,12 +152,12 @@ sudo tar -C /usr -xzf ollama-linux-amd64.tgz
 
 ## Installing specific versions
 
-Use `OLLAMA_VERSION` environment variable with the install script to install a specific version of Ollama, including pre-releases. You can find the version numbers in the [releases page](https://github.com/ollama/ollama/releases). 
+Use `OLLAMA_VERSION` environment variable with the install script to install a specific version of Ollama, including pre-releases. You can find the version numbers in the [releases page](https://github.com/ollama/ollama/releases).
 
 For example:
 
 ```shell
-curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION=0.3.9 sh
+curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION=0.5.7 sh
 ```
 
 ## Viewing logs
@@ -167,4 +190,10 @@ Remove the downloaded models and Ollama service user and group:
 sudo rm -r /usr/share/ollama
 sudo userdel ollama
 sudo groupdel ollama
+```
+
+Remove installed libraries:
+
+```shell
+sudo rm -rf /usr/local/lib/ollama
 ```
